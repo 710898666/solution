@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨板连接器 Pin Mapping</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scene Navigation -->
+<div class="scene-nav">
+  <button class="scene-btn active" data-scene="1" onclick="switchScene(1)">① 连线自动生成</button>
+  <button class="scene-btn" data-scene="2" onclick="switchScene(2)">② 默认 1:1 Mapping</button>
+  <button class="scene-btn" data-scene="3" onclick="switchScene(3)">③ 电源并线编辑</button>
+  <button class="scene-btn" data-scene="4" onclick="switchScene(4)">④ 拖拽调序</button>
+</div>
+
+<!-- Scene Description -->
+<div class="scene-desc" id="sceneDesc">
+  <h2>场景一：连线穿越 Board 边界，自动生成连接器</h2>
+  <p>用户从 PSU 的 VDD_5V Port 连线到 Load 的 VDD_5V Port，线穿越了 Board 边界。<br/>系统自动在边界处生成一对 Connector 占位符（J1 ↔ J2）。</p>
+  <div class="hint">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>
+    点击下方画布中的连线试试
+  </div>
+</div>
+
+<!-- Canvas Mockup (Scene 1) -->
+<div class="canvas-mockup" id="canvasMockup">
+  <svg viewBox="0 0 1080 200" xmlns="http://www.w3.org/2000/svg">
+    <!-- Grid -->
+    <defs>
+      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1c2129" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#grid)"/>
+
+    <!-- Board A -->
+    <rect x="40" y="20" width="300" height="160" rx="8" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <text x="56" y="42" fill="#484f58" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">Board_A</text>
+
+    <!-- PSU Block -->
+    <rect x="80" y="60" width="120" height="100" rx="6" fill="#1c2129" stroke="#30363d" stroke-width="1"/>
+    <text x="140" y="82" fill="#e6edf3" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" text-anchor="middle">PSU</text>
+    <text x="190" y="100" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="end">VDD_5V ●</text>
+    <text x="190" y="116" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="end">DATA_TX ●</text>
+    <text x="190" y="132" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="end">GND ●</text>
+
+    <!-- Board B -->
+    <rect x="740" y="20" width="300" height="160" rx="8" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <text x="756" y="42" fill="#484f58" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">Board_B</text>
+
+    <!-- Load Block -->
+    <rect x="880" y="60" width="120" height="100" rx="6" fill="#1c2129" stroke="#30363d" stroke-width="1"/>
+    <text x="940" y="82" fill="#e6edf3" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" text-anchor="middle">Load</text>
+    <text x="890" y="100" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10">● VDD_5V</text>
+    <text x="890" y="116" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10">● DATA_RX</text>
+    <text x="890" y="132" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10">● GND</text>
+
+    <!-- 动态层：创建后由 JS 根据分组方案渲染 -->
+    <g id="bundleLayer" style="opacity:0; transition: opacity 0.5s; pointer-events:none"></g>
+    <g id="wireLayer" style="opacity:0; transition: opacity 0.5s; pointer-events:none"></g>
+    <g id="connectorLayer" style="opacity:0; transition: opacity 0.5s; pointer-events:none"></g>
+
+    <!-- Wire before connectors (visible initially) -->
+    <g id="wiresBefore">
+      <line class="route-line signal-power" data-signal="power" x1="200" y1="97" x2="890" y2="97" stroke="#d29922" stroke-width="1.5" opacity="0.45"/>
+      <line class="route-line signal-data" data-signal="data" x1="200" y1="113" x2="890" y2="113" stroke="#58a6ff" stroke-width="1.5" opacity="0.45"/>
+      <line class="route-line signal-ground" data-signal="ground" x1="200" y1="129" x2="890" y2="129" stroke="#8b949e" stroke-width="1.5" opacity="0.45"/>
+    </g>
+
+    <text id="clickHint" x="540" y="175" fill="#58a6ff" font-family="Noto Sans SC, sans-serif" font-size="12" text-anchor="middle" opacity="0.6" style="pointer-events:none">单击选线，Ctrl 多选，右键创建/调整 Connector</text>
+  </svg>
+</div>
+
+<!-- Scene 1 Selection Status -->
+<div class="line-select-bar" id="lineSelectBar">
+  <span id="lineSelectText">已选 0 条线（跨板 0）</span>
+  <div class="line-select-actions">
+    <button class="btn btn-ghost btn-mini" onclick="clearScene1Selection()">清空选择</button>
+    <button class="btn btn-primary btn-mini" onclick="openQuickCreateFromSelection()">创建 Connector</button>
+  </div>
+</div>
+
+<!-- Scene 1 Context Menu -->
+<div class="ctx-menu" id="scene1ContextMenu" style="display:none"></div>
+
+<!-- Scene 1 Quick Create Popover -->
+<div class="quick-pop" id="scene1QuickPop" style="display:none">
+  <div class="quick-title">基于已选线创建 Connector</div>
+  <div class="quick-row">
+    <label for="quickCapacity">每对容量</label>
+    <select id="quickCapacity">
+      <option value="3">3 根线 / 对</option>
+      <option value="2">2 根线 / 对</option>
+      <option value="1">1 根线 / 对</option>
+    </select>
+  </div>
+  <div class="quick-row">
+    <label for="quickGroupMode">分组方式</label>
+    <select id="quickGroupMode">
+      <option value="order">按当前选择顺序</option>
+      <option value="type">按信号类型</option>
+    </select>
+  </div>
+  <div class="quick-tip" id="quickPreviewText">将按当前已选线创建连接器分组</div>
+  <div class="quick-actions">
+    <button class="btn btn-ghost btn-mini" onclick="closeQuickCreate()">取消</button>
+    <button class="btn btn-primary btn-mini" onclick="confirmQuickCreate()">创建</button>
+  </div>
+</div>
+
+<!-- Scene 1 Bundle Explain Panel -->
+<div class="bundle-panel" id="bundlePanel" style="display:none">
+  <div class="bundle-title" id="bundleTitle">连接器已创建</div>
+  <div class="bundle-meta" id="bundleMeta">3 Signals → 1 Connector Pair</div>
+  <div class="bundle-adjust-title">创建后调整：可把信号换到不同 Connector 组合</div>
+  <div class="config-list" id="bundleAssignList"></div>
+  <div class="bundle-actions">
+    <button class="btn btn-ghost" onclick="applyBundleAdjustment()">应用调整</button>
+    <button class="btn btn-primary" onclick="switchScene(2)">查看 Pin Mapping</button>
+  </div>
+</div>
+
+<!-- Panel -->
+<div class="panel" id="mainPanel" style="display:none">
+  <!-- Header -->
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <span class="connector-badge badge-unspec" id="connBadge">未指定型号</span>
+      <div class="connector-path">
+        <span class="board-name">Board_A</span>
+        <span class="line">——</span>
+        <span class="conn-name">J1</span>
+        <span class="line">━━━━</span>
+        <span class="conn-name">J2</span>
+        <span class="line">——</span>
+        <span class="board-name">Board_B</span>
+      </div>
+    </div>
+    <div class="panel-header-right">
+      <div class="sync-indicator">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a6 6 0 00-4.25 10.25l.71-.71A5 5 0 1113 8h-2l3 3 3-3h-2A6 6 0 008 2z"/></svg>
+        J1/J2 联动
+      </div>
+      <div class="pin-summary">
+        <span class="label">Total Pins</span>
+        <span class="count" id="totalPinCount">3</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col style="width:36px">
+        <col style="width:120px">
+        <col style="width:140px">
+        <col style="min-width:180px">
+        <col style="width:70px">
+        <col style="min-width:180px">
+        <col style="width:120px">
+      </colgroup>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Source</th>
+          <th>System Net</th>
+          <th>J1 Pin(s)</th>
+          <th class="center">Cable</th>
+          <th>J2 Pin(s)</th>
+          <th>Target</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <!-- Rows injected by JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="panel-footer">
+    <div class="footer-info">
+      <div class="info-item">
+        <div class="dot dot-green"></div>
+        <span>行数 = System_Net 数量，非 Pin 数量</span>
+      </div>
+      <div class="info-item">
+        <div class="dot dot-orange"></div>
+        <span id="idleInfo">空闲 Pin: 0</span>
+      </div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-ghost">关闭</button>
+      <button class="btn btn-primary" onclick="showToast('已保存', 'Pin Mapping 已更新')">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts (顺序重要：依赖关系从上到下) -->
+<script src="js/data.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/pin-manager.js"></script>
+<script src="js/table-renderer.js"></script>
+<script src="js/drag-sort.js"></script>
+<script src="js/scene-manager-v2.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨板连接器 Pin Mapping</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #0d1117;
+  --bg-panel: #161b22;
+  --bg-row: #1c2129;
+  --bg-row-hover: #22272e;
+  --bg-row-drag: #2d333b;
+  --bg-input: #0d1117;
+  --border: #30363d;
+  --border-focus: #58a6ff;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-orange: #d29922;
+  --accent-red: #f85149;
+  --accent-purple: #bc8cff;
+  --accent-cyan: #39d5cf;
+  --pin-tag-bg: #1f3a5f;
+  --pin-tag-border: #2d5a8e;
+  --pin-tag-text: #79c0ff;
+  --idle-bg: #1a1e24;
+  --idle-text: #484f58;
+  --toast-bg: #1f6feb;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Noto Sans SC', -apple-system, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+/* ==================== Toast ==================== */
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+  max-width: 360px;
+}
+
+.toast .toast-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.toast .toast-desc {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ==================== Scene Nav ==================== */
+.scene-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.scene-btn {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scene-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.scene-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* ==================== Scene Description ==================== */
+.scene-desc {
+  max-width: 720px;
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.scene-desc h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.scene-desc p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.scene-desc .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: rgba(88, 166, 255, 0.1);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--accent-blue);
+}
+
+/* ==================== Panel ==================== */
+.panel {
+  width: 100%;
+  max-width: 1080px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+}
+
+/* Panel Header */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.connector-badge {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.5px;
+}
+
+.badge-auto {
+  background: rgba(57, 213, 207, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(57, 213, 207, 0.3);
+}
+
+.badge-unspec {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--accent-orange);
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+
+.connector-path {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.connector-path .board-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.connector-path .conn-name {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.connector-path .line {
+  color: var(--text-muted);
+}
+
+.panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pin-summary {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pin-summary .count {
+  font-weight: 600;
+  color: var(--accent-blue);
+  font-size: 15px;
+}
+
+.pin-summary .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--accent-green);
+  padding: 3px 8px;
+  background: rgba(63, 185, 80, 0.1);
+  border-radius: 10px;
+}
+
+.sync-indicator svg { width: 12px; height: 12px; }
+
+/* ==================== Table ==================== */
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+colgroup col.col-drag    { width: 36px; }
+colgroup col.col-source  { width: 130px; }
+colgroup col.col-net     { width: 150px; }
+colgroup col.col-pins    { width: 1fr; }
+colgroup col.col-cable   { width: 80px; }
+colgroup col.col-target  { width: 130px; }
+
+thead th {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  user-select: none;
+}
+
+thead th.center { text-align: center; }
+
+tbody tr {
+  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  transition: background 0.15s;
+}
+
+tbody tr:hover { background: var(--bg-row-hover); }
+
+tbody tr.dragging {
+  background: var(--bg-row-drag);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  opacity: 0.9;
+}
+
+tbody tr.drag-over-top { border-top: 2px solid var(--accent-blue); }
+tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent-blue); }
+
+tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+/* Drag handle */
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+tr:hover .drag-handle { opacity: 1; }
+
+.drag-handle:active { cursor: grabbing; }
+
+.drag-handle svg { width: 14px; height: 14px; }
+
+/* Source / Target cell */
+.signal-cell {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.signal-cell .block-name {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.signal-cell .signal-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Net cell */
+.net-cell {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent-green);
+  font-weight: 500;
+}
+
+/* Pin tags cell */
+.pins-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--pin-tag-bg);
+  border: 1px solid var(--pin-tag-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pin-tag-text);
+  white-space: nowrap;
+  transition: all 0.15s;
+  animation: pinAppear 0.2s ease;
+}
+
+@keyframes pinAppear {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.pin-tag .pin-remove {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--pin-tag-text);
+  opacity: 0.5;
+  transition: all 0.15s;
+  margin-left: 2px;
+}
+
+.pin-tag .pin-remove:hover {
+  opacity: 1;
+  color: var(--accent-red);
+}
+
+.pin-tag .pin-remove svg { width: 10px; height: 10px; }
+
+.pin-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.pin-add-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.pin-add-btn svg { width: 12px; height: 12px; }
+
+/* Cable cell */
+.cable-cell {
+  text-align: center;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 3px;
+}
+
+/* Idle row */
+tr.idle-row td {
+  color: var(--idle-text);
+  font-style: italic;
+  font-size: 12px;
+}
+
+tr.idle-row .pin-tag {
+  background: var(--idle-bg);
+  border-color: var(--border);
+  color: var(--idle-text);
+}
+
+/* ==================== Footer ==================== */
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.footer-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer-info .info-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.footer-info .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dot-green { background: var(--accent-green); }
+.dot-orange { background: var(--accent-orange); }
+
+.footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 20px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-row);
+  color: var(--text-primary);
+}
+
+.btn-primary {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #4090e8;
+}
+
+/* ==================== Canvas Mockup ==================== */
+.canvas-mockup {
+  width: 100%;
+  max-width: 1080px;
+  height: 200px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-mockup svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ==================== Responsive ==================== */
+@media (max-width: 768px) {
+  body { padding: 16px 8px; }
+  .panel-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+  .panel-header-right { align-self: flex-end; }
+  table { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scene Navigation -->
+<div class="scene-nav">
+  <button class="scene-btn active" data-scene="1" onclick="switchScene(1)">① 连线自动生成</button>
+  <button class="scene-btn" data-scene="2" onclick="switchScene(2)">② 默认 1:1 Mapping</button>
+  <button class="scene-btn" data-scene="3" onclick="switchScene(3)">③ 电源并线编辑</button>
+  <button class="scene-btn" data-scene="4" onclick="switchScene(4)">④ 拖拽调序</button>
+</div>
+
+<!-- Scene Description -->
+<div class="scene-desc" id="sceneDesc">
+  <h2>场景一：连线穿越 Board 边界，自动生成连接器</h2>
+  <p>用户从 PSU 的 VDD_5V Port 连线到 Load 的 VDD_5V Port，线穿越了 Board 边界。<br/>系统自动在边界处生成一对 Connector 占位符（J1 ↔ J2）。</p>
+  <div class="hint">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>
+    点击下方画布中的连线试试
+  </div>
+</div>
+
+<!-- Canvas Mockup (Scene 1) -->
+<div class="canvas-mockup" id="canvasMockup">
+  <svg viewBox="0 0 1080 200" xmlns="http://www.w3.org/2000/svg">
+    <!-- Grid -->
+    <defs>
+      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1c2129" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#grid)"/>
+
+    <!-- Board A -->
+    <rect x="40" y="20" width="300" height="160" rx="8" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <text x="56" y="42" fill="#484f58" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">Board_A</text>
+
+    <!-- PSU Block -->
+    <rect x="80" y="60" width="120" height="100" rx="6" fill="#1c2129" stroke="#30363d" stroke-width="1"/>
+    <text x="140" y="82" fill="#e6edf3" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" text-anchor="middle">PSU</text>
+    <text x="190" y="100" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="end">VDD_5V ●</text>
+    <text x="190" y="116" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="end">DATA_TX ●</text>
+    <text x="190" y="132" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="end">GND ●</text>
+
+    <!-- Board B -->
+    <rect x="740" y="20" width="300" height="160" rx="8" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="6 3"/>
+    <text x="756" y="42" fill="#484f58" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">Board_B</text>
+
+    <!-- Load Block -->
+    <rect x="880" y="60" width="120" height="100" rx="6" fill="#1c2129" stroke="#30363d" stroke-width="1"/>
+    <text x="940" y="82" fill="#e6edf3" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" text-anchor="middle">Load</text>
+    <text x="890" y="100" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10">● VDD_5V</text>
+    <text x="890" y="116" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10">● DATA_RX</text>
+    <text x="890" y="132" fill="#8b949e" font-family="JetBrains Mono, monospace" font-size="10">● GND</text>
+
+    <!-- Connector J1 (hidden initially) -->
+    <g id="connJ1" style="opacity:0; transition: opacity 0.5s">
+      <rect x="320" y="70" width="60" height="80" rx="4" fill="#161b22" stroke="#39d5cf" stroke-width="1.5"/>
+      <text x="350" y="62" fill="#39d5cf" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" text-anchor="middle">J1</text>
+      <circle cx="325" cy="95" r="2.5" fill="#58a6ff"/>
+      <circle cx="325" cy="110" r="2.5" fill="#58a6ff"/>
+      <circle cx="325" cy="125" r="2.5" fill="#58a6ff"/>
+      <circle cx="375" cy="95" r="2.5" fill="#58a6ff"/>
+      <circle cx="375" cy="110" r="2.5" fill="#58a6ff"/>
+      <circle cx="375" cy="125" r="2.5" fill="#58a6ff"/>
+    </g>
+
+    <!-- Connector J2 (hidden initially) -->
+    <g id="connJ2" style="opacity:0; transition: opacity 0.5s">
+      <rect x="700" y="70" width="60" height="80" rx="4" fill="#161b22" stroke="#39d5cf" stroke-width="1.5"/>
+      <text x="730" y="62" fill="#39d5cf" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" text-anchor="middle">J2</text>
+      <circle cx="705" cy="95" r="2.5" fill="#58a6ff"/>
+      <circle cx="705" cy="110" r="2.5" fill="#58a6ff"/>
+      <circle cx="705" cy="125" r="2.5" fill="#58a6ff"/>
+      <circle cx="755" cy="95" r="2.5" fill="#58a6ff"/>
+      <circle cx="755" cy="110" r="2.5" fill="#58a6ff"/>
+      <circle cx="755" cy="125" r="2.5" fill="#58a6ff"/>
+    </g>
+
+    <!-- Wires (hidden initially) -->
+    <g id="wires" style="opacity:0; transition: opacity 0.5s">
+      <line x1="200" y1="97" x2="325" y2="95" stroke="#d29922" stroke-width="1.5" opacity="0.7"/>
+      <line x1="200" y1="113" x2="325" y2="110" stroke="#58a6ff" stroke-width="1.5" opacity="0.7"/>
+      <line x1="200" y1="129" x2="325" y2="125" stroke="#8b949e" stroke-width="1.5" opacity="0.7"/>
+      <!-- Cable -->
+      <line x1="375" y1="95" x2="705" y2="95" stroke="#d29922" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>
+      <line x1="375" y1="110" x2="705" y2="110" stroke="#58a6ff" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>
+      <line x1="375" y1="125" x2="705" y2="125" stroke="#8b949e" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>
+      <!-- J2 to Load -->
+      <line x1="755" y1="95" x2="890" y2="97" stroke="#d29922" stroke-width="1.5" opacity="0.7"/>
+      <line x1="755" y1="110" x2="890" y2="113" stroke="#58a6ff" stroke-width="1.5" opacity="0.7"/>
+      <line x1="755" y1="125" x2="890" y2="129" stroke="#8b949e" stroke-width="1.5" opacity="0.7"/>
+    </g>
+
+    <!-- Wire before connectors (visible initially) -->
+    <g id="wiresBefore">
+      <line x1="200" y1="97" x2="890" y2="97" stroke="#d29922" stroke-width="1.5" opacity="0.4"/>
+      <line x1="200" y1="113" x2="890" y2="113" stroke="#58a6ff" stroke-width="1.5" opacity="0.4"/>
+      <line x1="200" y1="129" x2="890" y2="129" stroke="#8b949e" stroke-width="1.5" opacity="0.4"/>
+    </g>
+
+    <!-- Click zone -->
+    <rect id="wireClickZone" x="380" y="80" width="320" height="60" fill="transparent" cursor="pointer" onclick="triggerConnectorGen()"/>
+    <text id="clickHint" x="540" y="175" fill="#58a6ff" font-family="Noto Sans SC, sans-serif" font-size="12" text-anchor="middle" opacity="0.6" style="pointer-events:none">← 点击连线区域 →</text>
+  </svg>
+</div>
+
+<!-- Panel -->
+<div class="panel" id="mainPanel" style="display:none">
+  <!-- Header -->
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <span class="connector-badge badge-unspec" id="connBadge">未指定型号</span>
+      <div class="connector-path">
+        <span class="board-name">Board_A</span>
+        <span class="line">——</span>
+        <span class="conn-name">J1</span>
+        <span class="line">━━━━</span>
+        <span class="conn-name">J2</span>
+        <span class="line">——</span>
+        <span class="board-name">Board_B</span>
+      </div>
+    </div>
+    <div class="panel-header-right">
+      <div class="sync-indicator">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a6 6 0 00-4.25 10.25l.71-.71A5 5 0 1113 8h-2l3 3 3-3h-2A6 6 0 008 2z"/></svg>
+        J1/J2 联动
+      </div>
+      <div class="pin-summary">
+        <span class="label">Total Pins</span>
+        <span class="count" id="totalPinCount">3</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <colgroup>
+        <col style="width:36px">
+        <col style="width:120px">
+        <col style="width:140px">
+        <col style="min-width:180px">
+        <col style="width:70px">
+        <col style="min-width:180px">
+        <col style="width:120px">
+      </colgroup>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Source</th>
+          <th>System Net</th>
+          <th>J1 Pin(s)</th>
+          <th class="center">Cable</th>
+          <th>J2 Pin(s)</th>
+          <th>Target</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <!-- Rows injected by JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="panel-footer">
+    <div class="footer-info">
+      <div class="info-item">
+        <div class="dot dot-green"></div>
+        <span>行数 = System_Net 数量，非 Pin 数量</span>
+      </div>
+      <div class="info-item">
+        <div class="dot dot-orange"></div>
+        <span id="idleInfo">空闲 Pin: 0</span>
+      </div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-ghost">关闭</button>
+      <button class="btn btn-primary" onclick="showToast('已保存', 'Pin Mapping 已更新')">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== Data Model ====================
+let signals = [
+  { id: 's1', source: { block: 'PSU', signal: 'VDD_5V' }, net: 'SYS_5V_POWER', target: { block: 'Load', signal: 'VDD_5V' }, j1Pins: [1], j2Pins: [1], type: 'power' },
+  { id: 's2', source: { block: 'PSU', signal: 'DATA_TX' }, net: 'SYS_DATA_TX', target: { block: 'Load', signal: 'DATA_RX' }, j1Pins: [2], j2Pins: [2], type: 'data' },
+  { id: 's3', source: { block: 'PSU', signal: 'GND' }, net: 'SYS_GND', target: { block: 'Load', signal: 'GND' }, j1Pins: [3], j2Pins: [3], type: 'ground' },
+];
+
+let nextPinId = 4;
+let currentScene = 1;
+let connGenerated = false;
+
+// ==================== Render ====================
+function getTotalPins() {
+  return signals.reduce((sum, s) => sum + s.j1Pins.length, 0);
+}
+
+function getNextAvailablePin() {
+  const used = new Set(signals.flatMap(s => s.j1Pins));
+  let pin = 1;
+  while (used.has(pin)) pin++;
+  return pin;
+}
+
+function renumberPins() {
+  let n = 1;
+  signals.forEach(s => {
+    const count = s.j1Pins.length;
+    s.j1Pins = [];
+    s.j2Pins = [];
+    for (let i = 0; i < count; i++) {
+      s.j1Pins.push(n);
+      s.j2Pins.push(n);
+      n++;
+    }
+  });
+  nextPinId = n;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  signals.forEach((sig, idx) => {
+    const tr = document.createElement('tr');
+    tr.dataset.id = sig.id;
+    tr.draggable = true;
+    tr.addEventListener('dragstart', onDragStart);
+    tr.addEventListener('dragover', onDragOver);
+    tr.addEventListener('dragleave', onDragLeave);
+    tr.addEventListener('drop', onDrop);
+    tr.addEventListener('dragend', onDragEnd);
+
+    const typeColor = sig.type === 'power' ? 'var(--accent-orange)' : sig.type === 'ground' ? 'var(--text-muted)' : 'var(--accent-blue)';
+
+    tr.innerHTML = `
+      <td>
+        <div class="drag-handle">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 3a1 1 0 100 2 1 1 0 000-2zm5 0a1 1 0 100 2 1 1 0 000-2zm-5 4a1 1 0 100 2 1 1 0 000-2zm5 0a1 1 0 100 2 1 1 0 000-2zm-5 4a1 1 0 100 2 1 1 0 000-2zm5 0a1 1 0 100 2 1 1 0 000-2z"/></svg>
+        </div>
+      </td>
+      <td>
+        <div class="signal-cell">
+          <span class="block-name">${sig.source.block}.</span><span class="signal-name" style="color:${typeColor}">${sig.source.signal}</span>
+        </div>
+      </td>
+      <td><span class="net-cell">${sig.net}</span></td>
+      <td>
+        <div class="pins-cell" id="j1-${sig.id}">
+          ${sig.j1Pins.map(p => pinTagHTML(sig.id, p, 'j1')).join('')}
+          <button class="pin-add-btn" title="添加并联 Pin" onclick="addPin('${sig.id}')">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"/></svg>
+          </button>
+        </div>
+      </td>
+      <td class="cable-cell">━ ━ ━</td>
+      <td>
+        <div class="pins-cell" id="j2-${sig.id}">
+          ${sig.j2Pins.map(p => pinTagHTML(sig.id, p, 'j2')).join('')}
+        </div>
+      </td>
+      <td>
+        <div class="signal-cell">
+          <span class="block-name">${sig.target.block}.</span><span class="signal-name" style="color:${typeColor}">${sig.target.signal}</span>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Idle row
+  const idleCount = 0; // 未指定模式下无固定空闲
+  document.getElementById('totalPinCount').textContent = getTotalPins();
+  document.getElementById('idleInfo').textContent = `空闲 Pin: ${idleCount}`;
+}
+
+function pinTagHTML(sigId, pinNum, side) {
+  const removable = side === 'j1';
+  return `<span class="pin-tag">
+    Pin ${pinNum}
+    ${removable ? `<span class="pin-remove" onclick="removePin('${sigId}', ${pinNum})">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/></svg>
+    </span>` : ''}
+  </span>`;
+}
+
+// ==================== Pin Operations ====================
+function addPin(sigId) {
+  const sig = signals.find(s => s.id === sigId);
+  if (!sig) return;
+
+  const newPin = nextPinId++;
+  sig.j1Pins.push(newPin);
+  sig.j2Pins.push(newPin);
+
+  renumberPins();
+  renderTable();
+
+  showToast(
+    `Pin 已追加`,
+    `${sig.source.signal} 现在占用 ${sig.j1Pins.length} 个 Pin（联动 J1/J2）`
+  );
+}
+
+function removePin(sigId, pinNum) {
+  const sig = signals.find(s => s.id === sigId);
+  if (!sig || sig.j1Pins.length <= 1) {
+    showToast('无法移除', '每个信号至少保留 1 个 Pin', 'warn');
+    return;
+  }
+
+  sig.j1Pins = sig.j1Pins.filter(p => p !== pinNum);
+  sig.j2Pins = sig.j2Pins.filter(p => p !== pinNum);
+
+  renumberPins();
+  renderTable();
+
+  showToast(
+    `Pin 已移除`,
+    `${sig.source.signal} 现在占用 ${sig.j1Pins.length} 个 Pin`
+  );
+}
+
+// ==================== Drag & Drop ====================
+let dragSrcId = null;
+
+function onDragStart(e) {
+  dragSrcId = this.dataset.id;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const rect = this.getBoundingClientRect();
+  const midY = rect.top + rect.height / 2;
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+  if (e.clientY < midY) {
+    this.classList.add('drag-over-top');
+  } else {
+    this.classList.add('drag-over-bottom');
+  }
+}
+
+function onDragLeave() {
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over-top', 'drag-over-bottom');
+
+  const targetId = this.dataset.id;
+  if (dragSrcId === targetId) return;
+
+  const srcIdx = signals.findIndex(s => s.id === dragSrcId);
+  const tgtIdx = signals.findIndex(s => s.id === targetId);
+
+  const [moved] = signals.splice(srcIdx, 1);
+  const rect = this.getBoundingClientRect();
+  const insertIdx = e.clientY < rect.top + rect.height / 2 ? tgtIdx : tgtIdx + (srcIdx < tgtIdx ? 0 : 1);
+  signals.splice(insertIdx, 0, moved);
+
+  renumberPins();
+  renderTable();
+
+  showToast('顺序已调整', 'Pin 编号已自动重排');
+}
+
+function onDragEnd() {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+    el.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+}
+
+// ==================== Scene Management ====================
+function switchScene(n) {
+  currentScene = n;
+  document.querySelectorAll('.scene-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.scene) === n));
+
+  const desc = document.getElementById('sceneDesc');
+  const canvas = document.getElementById('canvasMockup');
+  const panel = document.getElementById('mainPanel');
+
+  if (n === 1) {
+    // Reset
+    signals = [
+      { id: 's1', source: { block: 'PSU', signal: 'VDD_5V' }, net: 'SYS_5V_POWER', target: { block: 'Load', signal: 'VDD_5V' }, j1Pins: [1], j2Pins: [1], type: 'power' },
+      { id: 's2', source: { block: 'PSU', signal: 'DATA_TX' }, net: 'SYS_DATA_TX', target: { block: 'Load', signal: 'DATA_RX' }, j1Pins: [2], j2Pins: [2], type: 'data' },
+      { id: 's3', source: { block: 'PSU', signal: 'GND' }, net: 'SYS_GND', target: { block: 'Load', signal: 'GND' }, j1Pins: [3], j2Pins: [3], type: 'ground' },
+    ];
+    nextPinId = 4;
+    connGenerated = false;
+    resetCanvas();
+    canvas.style.display = 'block';
+    panel.style.display = 'none';
+    desc.innerHTML = `
+      <h2>场景一：连线穿越 Board 边界，自动生成连接器</h2>
+      <p>用户从 PSU 的 Port 连线到 Load 的 Port，线穿越了 Board_A → Board_B 边界。<br/>系统自动在边界处插入一对 Connector 占位符（J1 ↔ J2），不打断用户流程。</p>
+      <div class="hint">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>
+        点击画布中央的连线区域触发
+      </div>`;
+    return;
+  }
+
+  canvas.style.display = 'none';
+  panel.style.display = 'block';
+
+  if (n === 2) {
+    // Default 1:1
+    signals = [
+      { id: 's1', source: { block: 'PSU', signal: 'VDD_5V' }, net: 'SYS_5V_POWER', target: { block: 'Load', signal: 'VDD_5V' }, j1Pins: [1], j2Pins: [1], type: 'power' },
+      { id: 's2', source: { block: 'PSU', signal: 'DATA_TX' }, net: 'SYS_DATA_TX', target: { block: 'Load', signal: 'DATA_RX' }, j1Pins: [2], j2Pins: [2], type: 'data' },
+      { id: 's3', source: { block: 'PSU', signal: 'GND' }, net: 'SYS_GND', target: { block: 'Load', signal: 'GND' }, j1Pins: [3], j2Pins: [3], type: 'ground' },
+    ];
+    nextPinId = 4;
+    desc.innerHTML = `
+      <h2>场景二：默认 1:1 Mapping — 用户点开连线查看</h2>
+      <p>每个 Signal 默认分配 1 个 Pin，Total Pins 自动求和。<br/>这是最简状态 — 架构师可以先不管 Pin 分配，以后再细化。</p>
+      <div class="hint">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>
+        注意每行右侧的 + 按钮 — 那是添加并联 Pin 的入口
+      </div>`;
+  } else if (n === 3) {
+    // Power parallel
+    signals = [
+      { id: 's1', source: { block: 'PSU', signal: 'VDD_5V' }, net: 'SYS_5V_POWER', target: { block: 'Load', signal: 'VDD_5V' }, j1Pins: [1, 2], j2Pins: [1, 2], type: 'power' },
+      { id: 's2', source: { block: 'PSU', signal: 'DATA_TX' }, net: 'SYS_DATA_TX', target: { block: 'Load', signal: 'DATA_RX' }, j1Pins: [3], j2Pins: [3], type: 'data' },
+      { id: 's3', source: { block: 'PSU', signal: 'GND' }, net: 'SYS_GND', target: { block: 'Load', signal: 'GND' }, j1Pins: [4, 5, 6], j2Pins: [4, 5, 6], type: 'ground' },
+    ];
+    nextPinId = 7;
+    desc.innerHTML = `
+      <h2>场景三：电源并线 — 用户给 VDD 和 GND 追加 Pin</h2>
+      <p>VDD_5V 需要 2 个 Pin 并联走电流，GND 需要 3 个 Pin。<br/>用户通过 <strong>+</strong> 按钮逐个追加，Total Pins 实时更新为 6。每个 Pin Tag 可通过 × 移除。</p>
+      <div class="hint">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>
+        试试给 VDD_5V 再加一个 Pin，或移除 GND 的一个 Pin
+      </div>`;
+  } else if (n === 4) {
+    // Drag reorder
+    signals = [
+      { id: 's1', source: { block: 'PSU', signal: 'VDD_5V' }, net: 'SYS_5V_POWER', target: { block: 'Load', signal: 'VDD_5V' }, j1Pins: [1, 2], j2Pins: [1, 2], type: 'power' },
+      { id: 's2', source: { block: 'PSU', signal: 'DATA_TX' }, net: 'SYS_DATA_TX', target: { block: 'Load', signal: 'DATA_RX' }, j1Pins: [3], j2Pins: [3], type: 'data' },
+      { id: 's3', source: { block: 'PSU', signal: 'GND' }, net: 'SYS_GND', target: { block: 'Load', signal: 'GND' }, j1Pins: [4, 5, 6], j2Pins: [4, 5, 6], type: 'ground' },
+    ];
+    nextPinId = 7;
+    desc.innerHTML = `
+      <h2>场景四：拖拽调整信号顺序</h2>
+      <p>架构师想把 GND 排在最前面、VDD 排中间、数据线排最后。<br/>拖拽行左侧的 ⠿ 手柄即可调序，松手后 Pin 编号<strong>自动重排</strong>。</p>
+      <div class="hint">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z"/></svg>
+        拖拽 GND 行到最上方试试
+      </div>`;
+  }
+
+  renderTable();
+}
+
+// ==================== Canvas Animation ====================
+function triggerConnectorGen() {
+  if (connGenerated) {
+    // Open panel
+    switchScene(2);
+    return;
+  }
+
+  connGenerated = true;
+
+  // Hide raw wires
+  document.getElementById('wiresBefore').style.opacity = '0';
+  document.getElementById('clickHint').style.opacity = '0';
+
+  // Show connectors
+  setTimeout(() => {
+    document.getElementById('connJ1').style.opacity = '1';
+    document.getElementById('connJ2').style.opacity = '1';
+  }, 200);
+
+  // Show routed wires
+  setTimeout(() => {
+    document.getElementById('wires').style.opacity = '1';
+  }, 500);
+
+  // Toast
+  setTimeout(() => {
+    showToast('跨板连接器已自动创建', 'J1 ↔ J2 · 3 个信号 · 3 Pin — 点击连接器查看详情');
+  }, 600);
+
+  // Update click hint
+  setTimeout(() => {
+    document.getElementById('clickHint').textContent = '点击连接器打开 Pin Mapping';
+    document.getElementById('clickHint').style.opacity = '0.6';
+  }, 1200);
+}
+
+function resetCanvas() {
+  document.getElementById('wiresBefore').style.opacity = '1';
+  document.getElementById('connJ1').style.opacity = '0';
+  document.getElementById('connJ2').style.opacity = '0';
+  document.getElementById('wires').style.opacity = '0';
+  document.getElementById('clickHint').textContent = '← 点击连线区域 →';
+  document.getElementById('clickHint').style.opacity = '0.6';
+}
+
+// ==================== Toast ====================
+function showToast(title, desc, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  if (type === 'warn') toast.style.borderLeftColor = 'var(--accent-orange)';
+  toast.innerHTML = `<div class="toast-title">${title}</div><div class="toast-desc">${desc}</div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Init
+switchScene(1);
+</script>
+</body>
+</html>
